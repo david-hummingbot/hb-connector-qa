@@ -1,0 +1,15 @@
+# Ignore OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ignore Node.js / Python artifacts (just in case they get generated inside the skill folder)
+node_modules/
+__pycache__/
+*.pyc
+.env
+qa_errors.log
