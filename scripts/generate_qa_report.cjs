@@ -18,7 +18,7 @@ try {
   report += "|-----------|--------|-------|\n";
 
   results.forEach(test => {
-    const statusIcon = test.status === "PASS" ? "✅" : "❌";
+    const statusIcon = test.status === "PASS" ? "✅" : test.status === "SKIPPED" ? "⏭️" : "❌";
     report += `| ${test.name} | ${statusIcon} ${test.status} | ${test.notes || ""} |\n`;
   });
 

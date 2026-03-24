@@ -7,6 +7,13 @@ description: Automate the QA process for new Hummingbot exchange connectors. Use
 
 This skill provides a standardized workflow for QA testers to validate new Hummingbot connectors. It ensures all mandatory tests (connection, balances, market data, and order execution) are performed and reported consistently.
 
+## Execution Rules
+
+These rules apply throughout the entire QA workflow:
+
+1. **Working Directory**: At the start of the workflow, detect the current working directory or active workspace and use it as the base path for all file operations, cloning, and script execution. Do **not** default to `/` or any hardcoded root path.
+2. **Wait for Responses**: After executing any command that interacts with the exchange (e.g., fetching candles, placing an order, checking status), always allow sufficient time for the system to execute and return a response before reading the result or proceeding to the next step. Do not assume instant completion.
+
 ## Workflow
 
 To QA a new connector, follow these steps:
@@ -66,12 +73,20 @@ Test the core trading functionality using small amounts (Dust/Minimum order size
   - `LIMIT` Buy/Sell.
   - `MARKET` Buy/Sell.
   - `LIMIT_MAKER` (Post-only) orders.
-- **Cancellation**: Verify orders can be stopped/cancelled immediately.
+- **LIMIT Order Fill Validation**: After a LIMIT order is expected to fill (tight spread / near market), use `trading_active` or `search_history` to confirm:
+  - Status transitions from `OPEN` → `FILLED`.
+  - `filled_amount` is **not** flat `0`.
+  - `fees_paid` is **not** flat `0`.
+- **MARKET Order Fill Validation**: After a MARKET order is placed, verify:
+  - Status transitions from `OPEN` → `FILLED`.
+  - `filled_amount` is **not** flat `0`.
+  - `fees_paid` is **not** flat `0`.
+- **Cancellation**: To test cancellation, first fetch the current `mid_price` for the trading pair, then place a LIMIT order at least **1% away** from the mid_price (buy order at ≤ 99% of mid_price, sell order at ≥ 101% of mid_price) to prevent the order from being filled before cancellation. Then immediately cancel using `action="stop"` and verify the order is cancelled.
 - **Position Management**: (For Perps/CLMM) Use `lp_executor` or `position_executor` to verify lifecycle tracking.
 
 ### 5. Generate QA Report
 After testing, summarize the results using the bundled reporting script.
-- Collect results in a JSON format: `[{"name": "Connect", "status": "PASS"}, {"name": "Limit Buy", "status": "FAIL", "notes": "Order rejected due to precision"}]`.
+- Collect results in a JSON format. Valid statuses are `PASS`, `FAIL`, and `SKIPPED` (use `SKIPPED` for tests that don't apply to the connector, e.g. candles or funding rate on a spot-only connector): `[{"name": "Connect", "status": "PASS"}, {"name": "Limit Buy", "status": "FAIL", "notes": "Order rejected due to precision"}, {"name": "Candles", "status": "SKIPPED", "notes": "Not supported by this connector"}]`.
 - Run the script: `node scripts/generate_qa_report.cjs '<json_results>'`.
 - Display the full generated Markdown report to the user in the chat.
 - Ask the user: **"Would you like to post this report back to the GitHub PR?"** and only post it if they confirm.
@@ -83,9 +98,36 @@ After testing, summarize the results using the bundled reporting script.
    - Steps taken / steps to reproduce the issue.
    - The exact error messages and stack traces.
    - An explanation of the issue.
-   - Suggested code changes (if any) to fix the issue.
 3. **NOTIFY USER**: Inform the user about the issue immediately.
 4. **CONTINUE IF POSSIBLE**: If it's still possible to proceed with other independent items in the checklist, continue testing. If the issue prevents further progress entirely, inform the user that the testing is halted and display the current overall test summary.
+
+### Log File Format
+Each entry in the log file must use the following format for readability:
+
+```
+##### <Test Name> - <STATUS>
+- <description / details>
+
+---------
+
+##### <Test Name> - <STATUS>
+- <description / details>
+
+---------
+```
+
+**Example:**
+```
+##### Candles Test - PASSED
+- Successfully fetched 100 OHLCV candles for BTC-USDT on 1m interval.
+
+---------
+
+##### LIMIT ORDERS Test - PASSED
+- Placed limit buy at 99% of mid_price, verified fill and cancellation.
+
+---------
+```
 
 ## Mandatory Checklist
 Always cross-reference your tests with the [QA Checklist](references/qa-checklist.md) to ensure no connector-specific requirements are missed.
