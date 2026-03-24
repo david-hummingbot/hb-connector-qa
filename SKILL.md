@@ -11,6 +11,31 @@ This skill provides a standardized workflow for QA testers to validate new Hummi
 
 To QA a new connector, follow these steps:
 
+### 0. Prerequisite Check: hummingbot-mcp
+Before doing anything else, verify that the `hummingbot-mcp` MCP tool is available in the current environment.
+- Check whether `hummingbot-mcp-docker` (or an equivalent hummingbot-mcp server) is listed among the active MCP servers/tools.
+- **If hummingbot-mcp IS present**: proceed normally to Step 1.
+- **If hummingbot-mcp is NOT present**:
+  - Immediately alert the user: **"⚠️ The `hummingbot-mcp` tool was not detected. This skill requires hummingbot-mcp to function. Would you like to add it now, or continue anyway?"**
+  - **If the user wants to add it**, instruct them to add the following entry to their MCP server configuration (e.g. `~/.gemini/settings.json` under `mcpServers`):
+    ```json
+    "hummingbot-mcp-docker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--network",
+        "host",
+        "-v",
+        "hummingbot_mcp:/root/.hummingbot_mcp",
+        "hummingbot/hummingbot-mcp:latest"
+      ]
+    }
+    ```
+    After adding it, ask the user to reload/restart their MCP client and then re-run this skill.
+  - **If the user wants to continue anyway**: inform the user that the skill will use **manual `curl` commands** to test the connector in place of hummingbot-mcp tools.
+
 ### 1. PR Setup & Environment
 First, prepare the environment by running the PR setup workflows for both Source and Docker builds.
 - Execute the [PR Setup Workflow](references/pr-setup.md). This is a Turbo Workflow. Substitute the PR ID from the user's prompt and run it to automatically perform the setup.
@@ -48,7 +73,8 @@ Test the core trading functionality using small amounts (Dust/Minimum order size
 After testing, summarize the results using the bundled reporting script.
 - Collect results in a JSON format: `[{"name": "Connect", "status": "PASS"}, {"name": "Limit Buy", "status": "FAIL", "notes": "Order rejected due to precision"}]`.
 - Run the script: `node scripts/generate_qa_report.cjs '<json_results>'`.
-- Post the generated Markdown report back to the GitHub PR.
+- Display the full generated Markdown report to the user in the chat.
+- Ask the user: **"Would you like to post this report back to the GitHub PR?"** and only post it if they confirm.
 
 ## Bug & Error Handling Rule
 **CRITICAL RULE**: If a bug or issue is found during any step of the QA process:
