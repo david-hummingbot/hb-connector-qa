@@ -24,23 +24,7 @@ Before doing anything else, verify that the `hummingbot-mcp` MCP tool is availab
 - **If hummingbot-mcp IS present**: proceed normally to Step 1.
 - **If hummingbot-mcp is NOT present**:
   - Immediately alert the user: **"⚠️ The `hummingbot-mcp` tool was not detected. This skill requires hummingbot-mcp to function. Would you like to add it now, or continue anyway?"**
-  - **If the user wants to add it**, instruct them to add the following entry to their MCP server configuration (e.g. `~/.gemini/settings.json` under `mcpServers`):
-    ```json
-    "hummingbot-mcp-docker": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "--network",
-        "host",
-        "-v",
-        "hummingbot_mcp:/root/.hummingbot_mcp",
-        "hummingbot/hummingbot-mcp:latest"
-      ]
-    }
-    ```
-    After adding it, ask the user to reload/restart their MCP client and then re-run this skill.
+  - **If the user wants to add it**, instruct them to follow the steps in [MCP Setup](references/mcp-setup.md) to add the server configuration.
   - **If the user wants to continue anyway**: inform the user that the skill will use **manual `curl` commands** to test the connector in place of hummingbot-mcp tools.
 
 ### 1. PR Setup & Environment
@@ -49,6 +33,7 @@ First, prepare the environment by running the PR setup workflows for both Source
 - **Source Build**: Must be completed and the client must start without errors.
 - **Docker Build**: Must be completed and the container must start without issues.
 - **Validation**: BOTH Source and Docker setups must pass. If one of them fails, mark the setup as incomplete and do NOT move on to the next test.
+- **QA credentials (`.env`)**: After Step 1 succeeds, run `bash scripts/collect_qa_env.sh` from the skill root so `API_KEY`, `SECRET`, and optional `TRADING_PASSWORD` are stored for later steps (or ensure they are already set via environment variables / an existing `.env`; see `.env.example`). Set `HB_QA_ENV` to use a different file path. Do **not** proceed to Hummingbot API setup until required keys are present.
 
 ### 2. Hummingbot API Setup (Required)
 Build the hummingbot library from the PR source and deploy it via hummingbot-api.
@@ -73,11 +58,7 @@ Test the core trading functionality using small amounts (Dust/Minimum order size
   - `LIMIT` Buy/Sell.
   - `MARKET` Buy/Sell.
   - `LIMIT_MAKER` (Post-only) orders.
-- **LIMIT Order Fill Validation**: After a LIMIT order is expected to fill (tight spread / near market), use `trading_active` or `search_history` to confirm:
-  - Status transitions from `OPEN` → `FILLED`.
-  - `filled_amount` is **not** flat `0`.
-  - `fees_paid` is **not** flat `0`.
-- **MARKET Order Fill Validation**: After a MARKET order is placed, verify:
+- **Fill Validation (LIMIT & MARKET orders)**: After a LIMIT or MARKET order is expected to fill (tight spread / near market), use `trading_active` or `search_history` to confirm:
   - Status transitions from `OPEN` → `FILLED`.
   - `filled_amount` is **not** flat `0`.
   - `fees_paid` is **not** flat `0`.
@@ -91,6 +72,9 @@ After testing, summarize the results using the bundled reporting script.
 - Display the full generated Markdown report to the user in the chat.
 - Ask the user: **"Would you like to post this report back to the GitHub PR?"** and only post it if they confirm.
 
+### 6. Cleanup & Shutdown
+Before the skill exits, tear down all services that were started (e.g., `uvicorn main:app` and `docker compose down` inside `hummingbot-api`). Confirm to the user that all services have been stopped.
+
 ## Bug & Error Handling Rule
 **CRITICAL RULE**: If a bug or issue is found during any step of the QA process:
 1. **NO CODE CHANGES**: Do not attempt to modify the codebase to fix the issue.
@@ -102,35 +86,10 @@ After testing, summarize the results using the bundled reporting script.
 4. **CONTINUE IF POSSIBLE**: If it's still possible to proceed with other independent items in the checklist, continue testing. If the issue prevents further progress entirely, inform the user that the testing is halted and display the current overall test summary.
 
 ### Log File Format
-Each entry in the log file must use the following format for readability:
-
-```
-##### <Test Name> - <STATUS>
-- <description / details>
-
----------
-
-##### <Test Name> - <STATUS>
-- <description / details>
-
----------
-```
-
-**Example:**
-```
-##### Candles Test - PASSED
-- Successfully fetched 100 OHLCV candles for BTC-USDT on 1m interval.
-
----------
-
-##### LIMIT ORDERS Test - PASSED
-- Placed limit buy at 99% of mid_price, verified fill and cancellation.
-
----------
-```
+Document errors in `qa_errors.log` (one entry per issue). Format each entry clearly with: `##### <Test Name> - <STATUS>` followed by bullet points detailing steps taken, error messages, and explanations.
 
 ## Mandatory Checklist
-Always cross-reference your tests with the [QA Checklist](references/qa-checklist.md) to ensure no connector-specific requirements are missed.
+Use [QA Checklist](references/qa-checklist.md) for **section 1** (environment and connection). For **checklist sections 2–6**, use `scripts/checklist/0X_*.py`: `--emit-json` / `--list` / `--emit-md` for a compact spec, or **`--run`** to execute real HTTP tests against the **hummingbot-api** instance from Step 2 (paths match the [hummingbot-api](https://github.com/hummingbot/hummingbot-api) repo’s `routers/` and `models/`). Set `HUMMINGBOT_API_*`, `HB_ACCOUNT`, `HB_CONNECTOR`, and `HB_TRADING_PAIR` in `.env` (see `.env.example`). Exchange keys from `collect_qa_env.sh` map into API credentials via `setup_connector` / add-credential as usual.
 
 ## Examples
 

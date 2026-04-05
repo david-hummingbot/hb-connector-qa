@@ -18,6 +18,7 @@ It provides a standardized, repeatable workflow for testing exchange integration
 - **hummingbot-mcp** (recommended): The skill uses the `hummingbot-mcp-docker` MCP server for all API interactions. Without it the skill falls back to raw `curl` commands.
 - **Docker**: Required to run the hummingbot-mcp server and the hummingbot-api container.
 - **Node.js**: Required to run the `generate_qa_report.cjs` report generation script.
+- **Python 3.10+**: Required for `scripts/checklist/*.py` (`--run` uses stdlib `urllib` only).
 
 ## Repository Structure
 - `SKILL.md`: The main agent instruction file that drives the QA workflow.
@@ -26,6 +27,8 @@ It provides a standardized, repeatable workflow for testing exchange integration
   - `hummingbot-api-setup.md`: Required background setup for the API server.
   - `qa-checklist.md`: The cross-referencing checklist for rigorous test validation.
 - `scripts/`:
+  - `collect_qa_env.sh`: Prompts for exchange credentials and writes `.env` (run after PR build succeeds).
+  - `checklist/`: Python modules for QA checklist sections 2–6. They call **hummingbot-api** REST routes (same paths as your local [hummingbot-api](https://github.com/hummingbot/hummingbot-api) `routers/`). Use `python3 scripts/checklist/<script>.py --run` with `.env` from `.env.example`, or `--emit-json` / `--list` / `--emit-md` for spec-only output.
   - `generate_qa_report.cjs`: A script to compile the final JSON test results into clean Markdown.
 
 ## Installation & Usage
